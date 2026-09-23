@@ -1,0 +1,65 @@
+rules_version = '2';
+
+// Security rules for the Worlds pick'em app.
+// Paste this whole file into Firebase console → Firestore Database → Rules → Publish.
+//
+// How access works: every league lives under a long random ID that only
+// appears in your invite link. Nobody can list leagues, so without the link
+// there's no way to find your data. Inside a league, friends are trusted, with
+// one hard rule: bets can't be placed or changed after they lock.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /leagues/{leagueId} {
+      function validLeague() {
+        return leagueId.size() >= 16;
+      }
+      function leagueData() {
+        return get(/databases/$(database)/documents/leagues/$(leagueId)).data;
+      }
+      function openUntil(ms) {
+        return ms == null || request.time.toMillis() < ms;
+      }
+      function matchOpen(matchId) {
+        let m = get(/databases/$(database)/documents/leagues/$(leagueId)/matches/$(matchId)).data;
+        return m.get('locked', false) != true && request.time.toMillis() < m.startMs;
+      }
+
+      // Read one league by its ID; listing all leagues is not allowed.
+      allow get, create, update: if validLeague();
+      allow list, delete: if false;
+
+      match /players/{playerId} {
+        allow read, write: if validLeague();
+      }
+
+      match /matches/{matchId} {
+        allow read, write: if validLeague();
+      }
+
+      // One doc per player per match: "<matchId>__<playerId>". Locked at match start.
+      match /picks/{pickId} {
+        allow read: if validLeague();
+        allow create, update: if validLeague()
+          && pickId == request.resource.data.matchId + '__' + request.resource.data.playerId
+          && matchOpen(request.resource.data.matchId);
+        // Deleting happens when an admin removes a match or a player.
+        allow delete: if validLeague();
+      }
+
+      // Champion + Swiss pick'em. Locked at settings.predictionsLockMs.
+      match /predictions/{playerId} {
+        allow read, delete: if validLeague();
+        allow create, update: if validLeague()
+          && openUntil(leagueData().get('settings', {}).get('predictionsLockMs', null));
+      }
+
+      // Knockout bracket. Locked at settings.knockoutLockMs.
+      match /brackets/{playerId} {
+        allow read, delete: if validLeague();
+        allow create, update: if validLeague()
+          && openUntil(leagueData().get('settings', {}).get('knockoutLockMs', null));
+      }
+    }
+  }
+}
