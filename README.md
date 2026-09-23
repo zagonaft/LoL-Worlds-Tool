@@ -24,6 +24,7 @@ side by side with ✓ / ✗.
   still need to pick, and everyone's picks once a match locks.
 - **Bracket**: tournament predictions and your knockout bracket.
 - **Standings**: the leaderboard, with points split by bet type.
+- **Help**: how to use the app, the points for each bet and the important Worlds dates.
 - **Admin**: fix results if needed, and manage matches, teams, players and settings.
 - **Live score widget**: bottom-right corner of every page. Open `#/widget` for a full-screen
   version, handy on a second screen.
@@ -154,7 +155,7 @@ Plain HTML, CSS and JavaScript (ES modules). There's no build step and no framew
 | `js/automation.js` | Automatic results: sync + fill in every finished game |
 | `scripts/robot.mjs` | The results robot that GitHub runs every 10 minutes |
 | `scripts/discord.mjs` | What the robot posts to Discord (and when) |
-| `js/views/*.js` | One file per screen, plus the live widget |
+| `js/views/*.js` | One file per screen (matches, bracket, standings, help, admin), plus the live widget |
 | `firestore.rules` | Database security rules |
 
 ## Good to know

@@ -8,6 +8,7 @@ import { runAutomation } from './automation.js';
 import * as matchesView from './views/matches.js';
 import * as bracketView from './views/bracket.js';
 import * as standingsView from './views/standings.js';
+import * as helpView from './views/help.js';
 import * as adminView from './views/admin.js';
 import * as loginView from './views/login.js';
 import * as widget from './views/widget.js';
@@ -16,6 +17,7 @@ const VIEWS = {
   matches: { title: 'Matches', view: matchesView },
   bracket: { title: 'Bracket', view: bracketView },
   standings: { title: 'Standings', view: standingsView },
+  help: { title: 'Help', view: helpView },
   admin: { title: 'Admin', view: adminView, adminOnly: true },
 };
 
