@@ -136,6 +136,16 @@ function settingsTab(ctx) {
       <div class="card-head"><h2>Results robot</h2></div>
       <p class="muted small">A small robot on GitHub imports scores and fills in every game's results every 10 minutes during Worlds, even when nobody has the app open. It needs this league ID, saved once as a GitHub secret called <code>LEAGUE_ID</code> (repo → Settings → Secrets and variables → Actions → New repository secret).</p>
       <div class="copy-row"><input id="league-id" readonly value="${esc(ctx.state.leagueId)}"><button class="btn btn-primary" data-action="copyLeagueId">Copy</button></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Discord</h2><span class="pill ${s.discordSpoilers ? 'pill-open' : 'pill-final'}">Spoilers ${s.discordSpoilers ? 'hidden' : 'shown'}</span></div>
+      <p class="muted small">The results robot can post to a Discord channel: match reminders (and who still has to pick), everyone's picks when betting locks, each game's result and points, the final score and leaderboard, and highlight videos.</p>
+      <ol class="small steps">
+        <li>In Discord: channel ⚙️ <strong>Edit Channel → Integrations → Webhooks → New Webhook</strong>, then <strong>Copy Webhook URL</strong>.</li>
+        <li>On GitHub: <strong>Settings → Secrets and variables → Actions → New repository secret</strong> named <code>DISCORD_WEBHOOK_URL</code>, with the URL as the value.</li>
+        <li>Test it: GitHub <strong>Actions → Results robot → Run workflow</strong>, and tick <em>Also send a test message to Discord</em>.</li>
+      </ol>
+      <p class="muted small">Scores and winners are ${s.discordSpoilers ? 'hidden behind spoiler tags (click to reveal)' : 'posted openly'}. Change this in <strong>Edit settings</strong>.</p>
     </section>`;
 }
 
@@ -452,6 +462,7 @@ function settingsEditor(ctx) {
             <label><span>${esc(label)}</span><input type="number" min="0" name="pt-${k}" value="${s.points[k]}"></label>`).join('')}</div>
         </fieldset>
         <label class="check"><input type="checkbox" name="liveApi" ${s.liveApi ? 'checked' : ''}> Use LoL Esports live data (score widget, schedule sync, auto-fill)</label>
+        <label class="check"><input type="checkbox" name="discordSpoilers" ${s.discordSpoilers ? 'checked' : ''}> Discord: hide scores and winners behind spoiler tags</label>
         <label class="field"><span>Schedule sync ignores matches before</span><input type="date" name="since" value="${new Date(s.scheduleSinceMs).toISOString().slice(0, 10)}"></label>
         <div class="form-actions">
           <button type="button" class="btn btn-ghost" data-reset>Reset points to defaults</button>
@@ -475,6 +486,7 @@ function settingsEditor(ctx) {
           lengthBuckets: buckets.length ? buckets : s.lengthBuckets,
           points,
           liveApi: fd.get('liveApi') === 'on',
+          discordSpoilers: fd.get('discordSpoilers') === 'on',
           scheduleSinceMs: Date.parse(`${fd.get('since')}T00:00:00Z`) || s.scheduleSinceMs,
         };
         if (await ctx.save(ctx.paths.league(), { name: fd.get('name').toString().trim(), settings })) {

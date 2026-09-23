@@ -15,7 +15,36 @@ export function leaguePaths(leagueId) {
     league: () => base,
     matches: () => `${base}/matches`,
     match: (id) => `${base}/matches/${id}`,
+    players: () => `${base}/players`,
+    picks: () => `${base}/picks`,
+    predictions: () => `${base}/predictions`,
+    brackets: () => `${base}/brackets`,
   };
+}
+
+// Who won game n, when we can know it for sure (the timeline only gives a guess).
+export function certainWinner(result, n) {
+  const a = Number(result.scoreA) || 0;
+  const b = Number(result.scoreB) || 0;
+  const seen = result.gameWinners?.[n];
+  if (seen) return seen; // we saw the score go up right after this game
+  if (a === 0) return 'B';
+  if (b === 0) return 'A';
+  if (result.status !== 'final') return null;
+  if (n === a + b) return a > b ? 'A' : 'B'; // the deciding game goes to the series winner
+  // Count the other games we're sure about; if one team has no wins left to
+  // hand out, every remaining game (including this one) went to the other team.
+  let knownA = 0;
+  let knownB = 0;
+  for (let i = 1; i <= a + b; i++) {
+    if (i === n) continue;
+    const w = result.gameWinners?.[i] || (i === a + b ? (a > b ? 'A' : 'B') : null);
+    if (w === 'A') knownA++;
+    if (w === 'B') knownB++;
+  }
+  if (a - knownA === 0) return 'B';
+  if (b - knownB === 0) return 'A';
+  return null;
 }
 
 // Fills every finished game that hasn't been filled yet. Values someone
@@ -39,9 +68,8 @@ export async function autofillMatches({ store, paths, matches, now = Date.now(),
         const res = await autofillGame(m, n);
         const next = { ...g };
         for (const k of GAME_FIELDS) if (next[k] == null && res[k] != null) next[k] = res[k];
-        // If one team hasn't won a game yet, we know exactly who won each game.
-        if (scoreA === 0) next.winner = 'B';
-        else if (scoreB === 0) next.winner = 'A';
+        const sure = certainWinner(r, n);
+        if (sure) next.winner = sure;
         next.auto = true;
         games[n - 1] = next;
         changed = true;
@@ -51,6 +79,23 @@ export async function autofillMatches({ store, paths, matches, now = Date.now(),
         // Usually the data isn't ready yet; try again on the next run.
         log(`Game ${n} of ${m.teamA} vs ${m.teamB} not filled yet: ${err.message}`);
         break;
+      }
+    }
+    // Fix auto-filled winners with what we now know for sure, and drop guesses
+    // that can't add up to the final score (better no winner than a wrong one).
+    for (let n = 1; n <= played; n++) {
+      const g = games[n - 1];
+      if (!g?.auto) continue;
+      const sure = certainWinner(r, n);
+      if (sure && g.winner !== sure) { games[n - 1] = { ...g, winner: sure }; changed = true; }
+    }
+    if (r.status === 'final') {
+      const wins = (side) => games.slice(0, played).filter((g) => g?.winner === side).length;
+      if (wins('A') > scoreA || wins('B') > scoreB) {
+        for (let n = 1; n <= played; n++) {
+          const g = games[n - 1];
+          if (g?.auto && g.winner && !certainWinner(r, n)) { games[n - 1] = { ...g, winner: null }; changed = true; }
+        }
       }
     }
     if (changed) {

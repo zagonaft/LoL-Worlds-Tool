@@ -49,6 +49,11 @@ export async function syncSchedule({ store, paths, league, matches }) {
     if (!existing?.bracketSlot && slotOf.has(ev.esportsMatchId)) patch.bracketSlot = slotOf.get(ev.esportsMatchId);
     if (!existing?.result?.manual && ev.state !== 'unstarted') {
       patch.result = { status: ev.state === 'completed' ? 'final' : 'live', scoreA: ev.scoreA, scoreB: ev.scoreB };
+      // Exactly one more game finished since we last looked: whoever's score went up won it.
+      const prevA = Number(existing?.result?.scoreA) || 0;
+      const prevB = Number(existing?.result?.scoreB) || 0;
+      const total = ev.scoreA + ev.scoreB;
+      if (total === prevA + prevB + 1) patch.result.gameWinners = { [total]: ev.scoreA > prevA ? 'A' : 'B' };
     }
     const changed = !existing || Object.entries(patch).some(([k, v]) =>
       k === 'result'

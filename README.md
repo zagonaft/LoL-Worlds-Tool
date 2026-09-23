@@ -101,6 +101,31 @@ It's free for public repos. To switch it on:
 4. To test it, open the **Actions** tab → **Results robot** → **Run workflow**. The log shows what
    it imported.
 
+### Discord channel (optional)
+
+The results robot can also post to a Discord channel, so everyone can follow along there:
+
+| When | What it posts |
+|---|---|
+| ~1 hour before a match | ⏰ Reminder, plus who still hasn't picked, with a link to the app |
+| When betting locks | 🔒 Everyone's picks, side by side |
+| After each game | 🎮 Winner, length, first blood/dragon/tower/baron, kills, and who earned points |
+| After the match | 🏁 Final score, points for the match and the updated leaderboard |
+| When it's on YouTube | 📺 The official LoL Esports highlight video |
+
+Scores and winners are hidden behind Discord **spoiler tags** (click to reveal), so nobody gets
+spoiled scrolling the channel. Turn that off in **Admin → Settings → Edit settings**. Posts arrive
+within about 10–20 minutes, because they come from the robot's regular check. To set it up:
+
+1. In Discord, open the channel's ⚙️ **Edit Channel → Integrations → Webhooks → New Webhook**,
+   give it a name and click **Copy Webhook URL**.
+2. On GitHub, go to **Settings → Secrets and variables → Actions → New repository secret**.
+   Name it `DISCORD_WEBHOOK_URL` and paste the URL. Keep the URL private: anyone who has it can post in the channel.
+3. Test it: **Actions → Results robot → Run workflow**, tick *Also send a test message to Discord*.
+
+The posts link to `https://<your-username>.github.io/<repo>/`. If the site lives somewhere else,
+add a repository **variable** (not secret) named `APP_URL` with the site's address.
+
 ## Try it without Firebase (demo mode)
 
 While `js/config.js` still says `null`, the app runs in **demo mode**: everything works, but data is only
@@ -110,7 +135,7 @@ To run it on your computer (needs [Node.js](https://nodejs.org)):
 
 ```bash
 npm start        # serves the site at http://localhost:5173
-npm test         # runs the scoring, LoL Esports and automation tests
+npm test         # runs the scoring, LoL Esports, automation and Discord tests
 ```
 
 ## How it's built
@@ -128,6 +153,7 @@ Plain HTML, CSS and JavaScript (ES modules). There's no build step and no framew
 | `js/sync.js` | Imports the Worlds schedule into your league |
 | `js/automation.js` | Automatic results: sync + fill in every finished game |
 | `scripts/robot.mjs` | The results robot that GitHub runs every 10 minutes |
+| `scripts/discord.mjs` | What the robot posts to Discord (and when) |
 | `js/views/*.js` | One file per screen, plus the live widget |
 | `firestore.rules` | Database security rules |
 

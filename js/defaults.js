@@ -80,6 +80,8 @@ export const DEFAULT_SETTINGS = {
   // Schedule sync ignores LoL Esports matches before this date.
   scheduleSinceMs: Date.parse('2026-10-01T00:00:00Z'),
   liveApi: true,
+  // Discord posts hide scores and winners behind ||spoiler|| tags.
+  discordSpoilers: true,
 };
 
 // Bets offered for every game of a series.

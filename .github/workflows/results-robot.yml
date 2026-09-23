@@ -1,16 +1,23 @@
 # Results robot: every 10 minutes during October and November it imports the
-# Worlds schedule and scores from LoL Esports and fills in each finished game's
-# first blood, dragon, tower, baron, length and kills. Nobody needs to watch.
+# Worlds schedule and scores from LoL Esports, fills in each finished game's
+# first blood, dragon, tower, baron, length and kills, and (optionally) posts
+# reminders, picks, results, standings and highlights to a Discord channel.
 #
 # Setup (once): repo Settings → Secrets and variables → Actions →
-# New repository secret, named LEAGUE_ID, with your league ID
-# (the part after "?league=" in your invite link).
+# New repository secret:
+#   LEAGUE_ID            your league ID (the part after "?league=" in your invite link)
+#   DISCORD_WEBHOOK_URL  optional: a Discord channel webhook URL
 name: Results robot
 
 on:
   schedule:
     - cron: '*/10 * * 10,11 *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      discord_test:
+        description: 'Also send a test message to Discord'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,7 +35,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Import results from LoL Esports
+      - name: Import results and post to Discord
         run: node scripts/robot.mjs
         env:
           LEAGUE_ID: ${{ secrets.LEAGUE_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_TEST: ${{ inputs.discord_test }}
+          APP_URL: ${{ vars.APP_URL }}

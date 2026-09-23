@@ -66,7 +66,8 @@ test('never overwrites values typed in by hand, and skips games already done', a
   const saved = store.writes[0].data.result.games;
   assert.equal(saved[0].firstBlood, 'B'); // hand-entered value kept
   assert.equal(saved[0].firstDragon, 'A'); // blank filled in
-  assert.deepEqual(saved[1], games[1]); // already auto-filled: untouched
+  // Already auto-filled: not fetched again, only the (certain, it's a 2-0) winner is added.
+  assert.deepEqual(saved[1], { ...games[1], winner: 'A' });
 });
 
 test('ignores matches that are not linked, not started or too old', async () => {
@@ -101,4 +102,45 @@ test('merge writes only touch the fields being changed', () => {
   assert.deepEqual(maskPaths({ result: { status: 'final', scoreA: 2 }, teams: [1] }), ['result.status', 'result.scoreA', 'teams']);
   assert.deepEqual(maskPaths({ games: { 1: { firstBlood: 'A' } } }), ['games.`1`.firstBlood']);
   assert.deepEqual(maskPaths({ actual: {} }), ['actual']);
+});
+
+test('game winners are only taken as certain when they can be known', async () => {
+  const { certainWinner } = await import('../js/automation.js');
+  // Saw the score go up after game 2.
+  assert.equal(certainWinner({ status: 'live', scoreA: 1, scoreB: 1, gameWinners: { 2: 'B' } }, 2), 'B');
+  // Sweeps.
+  assert.equal(certainWinner({ status: 'live', scoreA: 2, scoreB: 0 }, 1), 'A');
+  // Deciding game goes to the series winner.
+  assert.equal(certainWinner({ status: 'final', scoreA: 1, scoreB: 3 }, 4), 'B');
+  // 3-1 with games 1 and 4 known (A, A) and game 2 known B → game 3 must be A.
+  assert.equal(certainWinner({ status: 'final', scoreA: 3, scoreB: 1, gameWinners: { 1: 'A', 2: 'B' } }, 3), 'A');
+  // Not enough information: keep the guess.
+  assert.equal(certainWinner({ status: 'final', scoreA: 3, scoreB: 1 }, 2), null);
+  assert.equal(certainWinner({ status: 'live', scoreA: 1, scoreB: 1 }, 1), null);
+});
+
+test('sync records who won a game when the score goes up by one', async () => {
+  const { syncSchedule } = await import('../js/sync.js');
+  const ev = (a, b, state = 'inProgress') => ({ startTime: new Date(Date.now() - 3600e3).toISOString(), state, blockName: 'Swiss',
+    match: { id: 'x1', strategy: { count: 3 }, teams: [{ code: 'T1', name: 'T1', result: { gameWins: a } }, { code: 'GEN', name: 'Gen.G', result: { gameWins: b } }] } });
+  let events = [ev(0, 1)];
+  globalThis.fetch = async () => Response.json({ data: { schedule: { pages: {}, events } } });
+  const writes = [];
+  const store = { async set(path, data) { writes.push(data); } };
+  const league = { teams: [{ code: 'T1' }, { code: 'GEN' }], settings: { scheduleSinceMs: 0 } };
+  await syncSchedule({ store, paths: leaguePaths('L'), league, matches: [] });
+  assert.deepEqual(writes[0].result.gameWinners, { 1: 'B' });
+  events = [ev(1, 1)];
+  await syncSchedule({ store, paths: leaguePaths('L'), league, matches: [{ id: 'lol_x1', esportsMatchId: 'x1', result: { status: 'live', scoreA: 0, scoreB: 1 } }] });
+  assert.deepEqual(writes[1].result.gameWinners, { 2: 'A' });
+});
+
+test('winner guesses that contradict the final score are dropped', async () => {
+  // Mock: GEN (team A, red side) "wins" every game by the timeline, but the real series was 2-1 to KC.
+  mockLoL();
+  const store = memoryStore();
+  await autofillMatches({ store, paths, matches: [match({ result: { status: 'final', scoreA: 1, scoreB: 2 } })] });
+  const winners = store.writes[0].data.result.games.map((g) => g.winner);
+  // Game 3 is the decider → KC for sure; games 1-2 can't both be GEN, so the guesses are dropped.
+  assert.deepEqual(winners, [null, null, 'B']);
 });
