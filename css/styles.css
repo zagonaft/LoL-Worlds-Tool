@@ -287,6 +287,19 @@ tbody th { font-weight: 500; color: var(--muted); }
 .standings .who { font-weight: 600; }
 .rules td { white-space: normal; }
 
+/* Help */
+.help h3 { font-size: 17px; margin: 18px 0 6px; color: var(--gold-2); }
+.help h3:first-of-type { margin-top: 4px; }
+.help ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+.help li { line-height: 1.5; }
+.dates td { white-space: normal; vertical-align: top; }
+.dates .when { white-space: nowrap; font-weight: 600; color: var(--gold-2); width: 1%; }
+.dates tr.key td { background: rgba(200, 170, 110, 0.07); }
+.dates tr.next td { box-shadow: inset 3px 0 0 var(--teal); }
+.dates tr.next td + td { box-shadow: none; }
+.dates tr.done td { color: var(--muted); }
+.dates tr.done .when { color: var(--win); }
+
 /* Bracket */
 .pred-row { display: grid; grid-template-columns: 220px 1fr; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .pred-row:last-child { border-bottom: 0; }
@@ -434,5 +447,8 @@ body.widget-page #app { display: none; }
   .settings-list { grid-template-columns: 1fr; gap: 2px; }
   .settings-list dd { margin-bottom: 8px; }
   .live-widget:not(.is-full) { right: 12px; left: 12px; display: flex; justify-content: flex-end; }
+  .dates tr { display: block; border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .dates td { display: block; border: 0; padding: 2px 10px; }
+  .dates .when { width: auto; }
   .lw-card { width: 100%; }
 }

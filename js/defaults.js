@@ -100,6 +100,19 @@ export const STAGES = {
   knockout: 'Knockouts',
 };
 
+// Key Worlds 2026 dates shown on the Help page. `lock` rows take their time
+// from the league settings, so they always match what the app enforces.
+export const KEY_DATES = [
+  { when: 'Oct 1', end: '2026-10-01', label: 'The results robot starts running automatically' },
+  { when: 'Oct 3', end: '2026-10-03', label: 'Last teams qualify', admin: 'Delete the TBD placeholder teams in Admin → Teams' },
+  { when: 'Oct 15–18', end: '2026-10-18', label: 'Play-In (Los Angeles)' },
+  { lock: 'predictionsLockMs', label: 'Swiss stage starts: tournament predictions lock', key: true },
+  { when: 'Oct 23–26 & Oct 28–31', end: '2026-10-31', label: 'Swiss stage (Allen, Texas)' },
+  { lock: 'knockoutLockMs', label: 'Quarterfinals start: knockout bracket locks', key: true },
+  { when: 'Nov 3–8', end: '2026-11-08', label: 'Quarterfinals and semifinals' },
+  { when: 'Nov 14', end: '2026-11-14', label: 'Final 🏆' },
+];
+
 export const BRACKET_SLOTS = ['QF1', 'QF2', 'QF3', 'QF4', 'SF1', 'SF2', 'F'];
 
 export const SLOT_LABELS = {
