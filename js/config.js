@@ -19,4 +19,12 @@
 //
 // While this is null the app runs in DEMO MODE: everything works, but data is
 // only saved in your own browser.
-export const FIREBASE_CONFIG = null;
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDlPebq8nhdMGOZUmNBEYXFetz5OQOrIPo',
+  authDomain: 'lol-worlds.firebaseapp.com',
+  projectId: 'lol-worlds',
+  storageBucket: 'lol-worlds.firebasestorage.app',
+  messagingSenderId: '708772720729',
+  appId: '1:708772720729:web:81a8ee4716c9f78ddc4148',
+  measurementId: 'G-JT2DKC536H',
+};
