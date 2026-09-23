@@ -24,8 +24,7 @@ side by side with ✓ / ✗.
   still need to pick, and everyone's picks once a match locks.
 - **Bracket**: tournament predictions and your knockout bracket.
 - **Standings**: the leaderboard, with points split by bet type.
-- **Admin**: add or sync matches, enter results (with auto-fill), and manage teams, players
-  and settings.
+- **Admin**: fix results if needed, and manage matches, teams, players and settings.
 - **Live score widget**: bottom-right corner of every page. Open `#/widget` for a full-screen
   version, handy on a second screen.
 
@@ -66,22 +65,41 @@ that keeps everyone's bets in sync.
 2. Join as the first player (pick a name and a PIN). The first player becomes the admin.
 3. Click **Invite** (top right) and send the link to your friends. Each of them joins with their own name and PIN.
 
-## Running the tournament (admin)
+## Running the tournament (it runs itself)
 
-- **Matches**: once Riot publishes the Worlds schedule, go to **Admin → Sync schedule from LoL
-  Esports**. It imports every match, team logo and series score, and repeats automatically every
-  few minutes while an admin has the app open. You can also add or edit matches by hand.
-- **Results**: series scores come in automatically from the sync. Open **Result** on a match to
-  confirm the per-game bets (first blood, dragon, tower, baron, length, kills). The **⚡ Auto-fill**
-  button reads the game's timeline from LoL Esports and fills everything in for you to check before saving.
-- **Swiss results**: in **Admin → Tournament results**, tap the teams that went 3-0, 0-3 or
-  advanced. Tick *Swiss stage is finished* when it's over.
-- **Knockout bracket**: knockout matches need a **bracket slot** (QF1–QF4, SF1, SF2, F). The sync
-  sets these in schedule order; check that QF1 and QF2 winners actually meet in SF1, and so on.
-  The bracket locks at the time set in **Settings** (default: Nov 3).
-- **Teams**: a few Worlds slots were still being decided when this was built (LPL 4th seed,
-  LCS 3rd seed, both CBLOL teams). Rename the TBD placeholders in **Admin → Teams** (or let the
-  sync add the real teams, then delete the placeholders).
+Results come in **automatically** from LoL Esports. Nobody has to watch the games or type anything in:
+
+- **Matches**: every Worlds match, team logo and series score is imported as soon as Riot publishes it.
+- **Per-game bets**: when a game ends, its first blood, first dragon, first tower, first baron,
+  game length and total kills are read from the game's timeline and saved, and points update for everyone.
+- **Swiss results**: 3-0, 0-3 and advancing teams are worked out from the Swiss match results.
+- **Champion**: taken from the result of the Final.
+
+This runs every few minutes while anyone has the app open, and every 10 minutes on GitHub
+through the **results robot** (below), so it keeps going even when nobody's watching.
+
+You only need the Admin page to **fix a mistake**:
+- **Admin → Result** on a match edits any game. Auto-filled games are tagged *auto*.
+  Game length is approximate because pauses count, and the per-game winner is a best guess.
+- **Admin → Tournament results**: tap a team to correct the Swiss results.
+- **Knockout bracket**: knockout matches get a bracket slot (QF1–QF4, SF1, SF2, F) in schedule
+  order. If the real bracket pairs them differently (QF1 and QF2 winners should meet in SF1),
+  fix the slots with **Edit** before the bracket locks (Settings; default Nov 3).
+- **Teams**: the real teams for the TBD slots (LPL 4th seed, LCS 3rd seed, CBLOL) are added
+  automatically on the first sync. Delete the leftover TBD placeholders in **Admin → Teams**.
+
+### Results robot (one-time setup)
+
+The robot is a GitHub Action ([`.github/workflows/results-robot.yml`](.github/workflows/results-robot.yml))
+that runs [`scripts/robot.mjs`](scripts/robot.mjs) every 10 minutes during October and November.
+It's free for public repos. To switch it on:
+
+1. Make sure this code is on the **`main`** branch. GitHub only runs scheduled robots from the default branch.
+2. In the app, go to **Admin → Settings** and copy your **league ID**.
+3. On GitHub, go to **Settings → Secrets and variables → Actions → New repository secret**.
+   Name it `LEAGUE_ID`, paste the ID as the value, and save.
+4. To test it, open the **Actions** tab → **Results robot** → **Run workflow**. The log shows what
+   it imported.
 
 ## Try it without Firebase (demo mode)
 
@@ -92,7 +110,7 @@ To run it on your computer (needs [Node.js](https://nodejs.org)):
 
 ```bash
 npm start        # serves the site at http://localhost:5173
-npm test         # runs the scoring and LoL Esports tests
+npm test         # runs the scoring, LoL Esports and automation tests
 ```
 
 ## How it's built
@@ -108,14 +126,16 @@ Plain HTML, CSS and JavaScript (ES modules). There's no build step and no framew
 | `js/defaults.js` | Teams, default points and settings |
 | `js/lolesports.js` | Live scores, schedule and game timelines from LoL Esports |
 | `js/sync.js` | Imports the Worlds schedule into your league |
+| `js/automation.js` | Automatic results: sync + fill in every finished game |
+| `scripts/robot.mjs` | The results robot that GitHub runs every 10 minutes |
 | `js/views/*.js` | One file per screen, plus the live widget |
 | `firestore.rules` | Database security rules |
 
 ## Good to know
 
 - **Live data** comes from the same unofficial API that lolesports.com uses. If Riot changes it,
-  the widget falls back to scores entered in the app, and results can always be entered by hand.
-  Auto-fill's game length is approximate because pauses count, so double-check it.
+  the widget falls back to scores entered in the app, and results can always be entered by hand
+  in **Admin → Result**.
 - **PINs** only stop friends from betting as each other by accident. They are not real passwords.
 - **Anyone with the invite link can join**, so only share it with your group.
 - **Free tier**: Firebase's free plan allows 50,000 reads and 20,000 writes per day, far more than a

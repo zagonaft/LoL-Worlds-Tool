@@ -201,22 +201,23 @@ export function scorePredictions(pred, actual, points) {
     else if (eliminated.has(pred.champion) || s03.includes(pred.champion) || (a.swissDone && !qualified.has(pred.champion))) status = 'lost';
     items.push(item('champion', 'predictions', pred.champion, a.champion ?? null, status, points.champion));
   }
+  const rec = (code) => a.records?.get(code) || { w: 0, l: 0 };
   for (const code of (pred.swiss30 || []).filter(Boolean)) {
     let status = 'pending';
     if (s30.includes(code)) status = 'won';
-    else if (a.swissDone || s30.length >= 2) status = 'lost';
+    else if (a.swissDone || s30.length >= 2 || rec(code).l > 0) status = 'lost';
     items.push(item('swiss30', 'predictions', code, null, status, points.swiss30));
   }
   for (const code of (pred.swiss03 || []).filter(Boolean)) {
     let status = 'pending';
     if (s03.includes(code)) status = 'won';
-    else if (a.swissDone || s03.length >= 2) status = 'lost';
+    else if (a.swissDone || s03.length >= 2 || rec(code).w > 0) status = 'lost';
     items.push(item('swiss03', 'predictions', code, null, status, points.swiss03));
   }
   for (const code of (pred.swissAdvance || []).filter(Boolean)) {
     let status = 'pending';
     if (qualified.has(code)) status = 'won';
-    else if (a.swissDone || s03.includes(code)) status = 'lost';
+    else if (a.swissDone || s03.includes(code) || eliminated.has(code)) status = 'lost';
     items.push(item('swissAdvance', 'predictions', code, null, status, points.swissAdvance));
   }
   return summarize(items);
@@ -245,14 +246,56 @@ export function scoreBracket(bracket, bstate, points) {
   return summarize(items);
 }
 
-// The real-world results everything is scored against.
+// Each team's win/loss record in finished Swiss matches.
+export function swissRecords(matches) {
+  const rec = new Map();
+  const bump = (code, key) => {
+    if (!code || code === 'TBD') return;
+    if (!rec.has(code)) rec.set(code, { w: 0, l: 0 });
+    rec.get(code)[key]++;
+  };
+  for (const m of matches) {
+    if (m.stage !== 'swiss') continue;
+    const sr = seriesResult(m);
+    if (!sr) continue;
+    bump(sideCode(m, sr.winner), 'w');
+    bump(sideCode(m, sr.winner === 'A' ? 'B' : 'A'), 'l');
+  }
+  return rec;
+}
+
+// Swiss outcomes worked out from the match results (3 wins = through, 3 losses = out).
+export function derivedSwiss(matches) {
+  const rec = swissRecords(matches);
+  const out = { swiss30: [], swiss03: [], swissAdvance: [], swissOut: [], swissDone: false };
+  let decided = 0;
+  for (const [code, { w, l }] of rec) {
+    if (w >= 3 && l === 0) out.swiss30.push(code);
+    else if (w >= 3) out.swissAdvance.push(code);
+    else if (l >= 3 && w === 0) out.swiss03.push(code);
+    if (l >= 3) out.swissOut.push(code);
+    if (w >= 3 || l >= 3) decided++;
+  }
+  out.swissDone = rec.size >= 16 && decided === rec.size;
+  return out;
+}
+
+// The real-world results everything is scored against. Swiss results come
+// from the match results automatically; anything an admin set by hand wins.
 export function tournamentActual(league, matches) {
   const bstate = bracketState(matches);
   const a = league?.actual || {};
+  const d = derivedSwiss(matches);
+  const pick = (k) => (a[k]?.length ? a[k] : d[k]);
   return {
     ...a,
+    swiss30: pick('swiss30'),
+    swiss03: pick('swiss03'),
+    swissAdvance: pick('swissAdvance'),
+    swissDone: !!a.swissDone || d.swissDone,
     champion: a.champion || bstate.F.winner || null,
-    eliminated: knockoutEliminated(bstate),
+    eliminated: new Set([...knockoutEliminated(bstate), ...d.swissOut]),
+    records: swissRecords(matches),
     bstate,
   };
 }

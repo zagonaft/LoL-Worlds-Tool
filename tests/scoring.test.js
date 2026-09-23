@@ -159,3 +159,28 @@ test('standings rank players and share ranks on ties', () => {
   assert.equal(rows[2].rank, 2);
   assert.equal(rows[0].series, P.winner + P.score);
 });
+
+test('Swiss results are worked out from match results', async () => {
+  const { derivedSwiss, tournamentActual } = await import('../js/scoring.js');
+  let n = 0;
+  const sw = (a, b, winner) => ({ id: `s${n++}`, stage: 'swiss', teamA: a, teamB: b, bestOf: 1, result: { status: 'final', scoreA: winner === a ? 1 : 0, scoreB: winner === b ? 1 : 0 } });
+  const matches = [
+    sw('GEN', 'MVK', 'GEN'), sw('GEN', 'TL', 'GEN'), sw('GEN', 'KC', 'GEN'), // GEN 3-0
+    sw('MVK', 'CFO', 'CFO'), sw('MVK', 'C9', 'C9'), // MVK 0-3 (with the GEN loss)
+    sw('T1', 'TL', 'T1'), sw('T1', 'KC', 'KC'), sw('T1', 'C9', 'T1'), sw('T1', 'CFO', 'T1'), // T1 3-1
+  ];
+  const d = derivedSwiss(matches);
+  assert.deepEqual(d.swiss30, ['GEN']);
+  assert.deepEqual(d.swiss03, ['MVK']);
+  assert.deepEqual(d.swissAdvance, ['T1']);
+  assert.equal(d.swissDone, false);
+  // Admin overrides win over the automatic result, and 0-3 teams count as eliminated.
+  const a = tournamentActual({ actual: { swiss30: ['HLE'] } }, matches);
+  assert.deepEqual(a.swiss30, ['HLE']);
+  assert.deepEqual(a.swiss03, ['MVK']);
+  assert.ok(a.eliminated.has('MVK'));
+  // A 3-0 pick is wrong as soon as that team loses once; a 0-3 pick as soon as it wins once.
+  const { scorePredictions } = await import('../js/scoring.js');
+  const r = scorePredictions({ swiss30: ['KC'], swiss03: ['C9'] }, tournamentActual({}, matches), P);
+  assert.deepEqual(r.items.map((i) => i.status), ['lost', 'lost']);
+});

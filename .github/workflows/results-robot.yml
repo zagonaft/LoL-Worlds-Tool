@@ -1,0 +1,34 @@
+# Results robot: every 10 minutes during October and November it imports the
+# Worlds schedule and scores from LoL Esports and fills in each finished game's
+# first blood, dragon, tower, baron, length and kills. Nobody needs to watch.
+#
+# Setup (once): repo Settings → Secrets and variables → Actions →
+# New repository secret, named LEAGUE_ID, with your league ID
+# (the part after "?league=" in your invite link).
+name: Results robot
+
+on:
+  schedule:
+    - cron: '*/10 * * 10,11 *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: results-robot
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Import results from LoL Esports
+        run: node scripts/robot.mjs
+        env:
+          LEAGUE_ID: ${{ secrets.LEAGUE_ID }}

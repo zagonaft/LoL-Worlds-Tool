@@ -4,7 +4,7 @@ import { createStore } from './store.js';
 import { DEFAULT_TEAMS, DEFAULT_SETTINGS, DEFAULT_POINTS, TOURNAMENT_NAME } from './defaults.js';
 import { esc, uid, toast, openModal, playerDot } from './ui.js';
 import { computeStandings } from './scoring.js';
-import { syncSchedule } from './sync.js';
+import { runAutomation } from './automation.js';
 import * as matchesView from './views/matches.js';
 import * as bracketView from './views/bracket.js';
 import * as standingsView from './views/standings.js';
@@ -95,18 +95,31 @@ const ctx = {
       return false;
     }
   },
+  // Import the schedule + scores and auto-fill finished games (see automation.js).
   async sync({ quiet = false } = {}) {
+    if (syncing) return null;
+    syncing = true;
+    localStorage.setItem(`lwt:${state.leagueId}:lastSync`, String(Date.now()));
     try {
-      const r = await syncSchedule({ store, paths, league: state.league, matches: state.matches });
-      if (!quiet) toast(`Synced ${r.found} matches (${r.created} new, ${r.updated} updated)`, 'success');
-      localStorage.setItem(`lwt:${state.leagueId}:lastSync`, String(Date.now()));
+      const r = await runAutomation({
+        store,
+        paths,
+        league: state.league,
+        getMatches: () => state.matches,
+        log: (msg) => console.info('[auto]', msg),
+      });
+      if (!quiet) toast(`Synced ${r.found} matches (${r.created} new, ${r.updated} updated) · ${r.filled} game${r.filled === 1 ? '' : 's'} auto-filled`, 'success');
       return r;
     } catch (err) {
       if (!quiet) toast(`Sync failed: ${err.message}`, 'error');
       return null;
+    } finally {
+      syncing = false;
     }
   },
 };
+
+let syncing = false;
 
 function reportError(err) {
   console.error(err);
@@ -332,9 +345,10 @@ function startTimers() {
     if (!typing && !document.querySelector('.modal-backdrop') && document.visibilityState === 'visible') render();
   }, 30000);
 
-  // Admins keep the schedule and series scores in sync with LoL Esports.
+  // Whoever has the app open keeps results up to date automatically (the
+  // GitHub results robot does the same when nobody has it open).
   const autoSync = () => {
-    if (!ctx.isAdmin || !state.league || !ctx.settings.liveApi || document.visibilityState !== 'visible') return;
+    if (!ctx.me || !state.league || !ctx.settings.liveApi || document.visibilityState !== 'visible') return;
     const last = Number(localStorage.getItem(`lwt:${state.leagueId}:lastSync`) || 0);
     if (Date.now() - last > 5 * 60000) ctx.sync({ quiet: true });
   };

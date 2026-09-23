@@ -47,14 +47,13 @@ function matchesTab(ctx) {
   return `
     <div class="toolbar">
       <button class="btn btn-primary" data-action="editMatch">+ Add match</button>
-      <button class="btn" data-action="syncNow" ${ctx.settings.liveApi ? '' : 'disabled'}>⟳ Sync schedule from LoL Esports</button>
+      <button class="btn" data-action="syncNow" ${ctx.settings.liveApi ? '' : 'disabled'}>⟳ Sync &amp; auto-fill now</button>
       ${ctx.demo ? '<button class="btn btn-ghost" data-action="demoData">Add sample matches</button>' : ''}
     </div>
     <p class="muted small">
       ${ctx.settings.liveApi
-        ? `Sync pulls every Worlds match, team logo and series score from LoL Esports (it also runs automatically every few minutes while an admin has the app open). Last sync: ${last ? relTime(last) : 'never'}.`
-        : 'LoL Esports live data is turned off in Settings.'}
-      Game-by-game bets (first blood, dragon, …) are confirmed by you in <strong>Result</strong>.
+        ? `Everything is automatic: matches, scores and each game's first blood, dragon, tower, baron, length and kills are imported from LoL Esports every few minutes (while anyone has the app open, and by the results robot on GitHub when nobody does). Use <strong>Result</strong> only to fix a mistake. Last sync on this device: ${last ? relTime(last) : 'never'}.`
+        : 'LoL Esports live data is turned off in Settings, so enter results with the <strong>Result</strong> button.'}
     </p>
     ${rows ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>Stage</th><th>Match</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
       : '<div class="empty"><p>No matches yet. Add one, or sync the schedule once Riot publishes it.</p></div>'}`;
@@ -64,17 +63,17 @@ function tournamentTab(ctx) {
   const a = ctx.league.actual || {};
   const actual = tournamentActual(ctx.league, ctx.state.matches);
   const chips = (field) => ctx.teams.map((t) => {
-    const on = (a[field] || []).includes(t.code);
+    const on = (actual[field] || []).includes(t.code);
     return `<button class="chip ${on ? 'chip-active' : ''}" data-action="toggleActual" data-field="${field}" data-code="${esc(t.code)}">${esc(t.code)}</button>`;
   }).join('');
   return `
     <section class="card">
       <div class="card-head"><h2>Swiss stage</h2></div>
-      <p class="muted small">Mark teams as soon as they're known. Points are awarded right away, and a pick is only marked wrong once it's impossible (or the Swiss stage is finished).</p>
+      <p class="muted small">This fills itself in from the Swiss match results (3 wins = through, 3 losses = out), so you don't need to touch it. Only tap a team if something is wrong; your correction then takes priority over the automatic result for that row.${['swiss30', 'swiss03', 'swissAdvance'].some((f) => a[f]?.length) ? ' <button class="btn btn-sm btn-ghost" data-action="resetActual">Undo my corrections</button>' : ''}</p>
       <h4 class="section-label">Went 3-0</h4><div class="chip-grid">${chips('swiss30')}</div>
       <h4 class="section-label">Went 0-3</h4><div class="chip-grid">${chips('swiss03')}</div>
       <h4 class="section-label">Advanced with 3-1 or 3-2</h4><div class="chip-grid">${chips('swissAdvance')}</div>
-      <label class="check"><input type="checkbox" data-change="swissDone" ${a.swissDone ? 'checked' : ''}> Swiss stage is finished (all other teams are out)</label>
+      <label class="check"><input type="checkbox" data-change="swissDone" ${actual.swissDone ? 'checked' : ''} ${actual.swissDone && !a.swissDone ? 'disabled' : ''}> Swiss stage is finished (all other teams are out)${actual.swissDone && !a.swissDone ? ' <span class="muted small">(detected automatically)</span>' : ''}</label>
     </section>
     <section class="card">
       <div class="card-head"><h2>Champion</h2></div>
@@ -132,7 +131,12 @@ function settingsTab(ctx) {
       <dt>Total kills line</dt><dd>${s.killsLine}</dd>
       <dt>Game length buckets</dt><dd>${s.lengthBuckets.join(' / ')} minutes</dd>
       <dt>LoL Esports live data</dt><dd>${s.liveApi ? 'On' : 'Off'}</dd>
-    </dl>`;
+    </dl>
+    <section class="card">
+      <div class="card-head"><h2>Results robot</h2></div>
+      <p class="muted small">A small robot on GitHub imports scores and fills in every game's results every 10 minutes during Worlds, even when nobody has the app open. It needs this league ID, saved once as a GitHub secret called <code>LEAGUE_ID</code> (repo → Settings → Secrets and variables → Actions → New repository secret).</p>
+      <div class="copy-row"><input id="league-id" readonly value="${esc(ctx.state.leagueId)}"><button class="btn btn-primary" data-action="copyLeagueId">Copy</button></div>
+    </section>`;
 }
 
 export function html(ctx) {
@@ -223,7 +227,7 @@ function resultEditor(ctx, match) {
     const g = games[n - 1] || {};
     return `
       <div class="game-edit" data-game="${n}">
-        <div class="game-edit-head"><strong>Game ${n}</strong>
+        <div class="game-edit-head"><strong>Game ${n}${g.auto ? ' <span class="pill pill-open" title="Filled in automatically from LoL Esports">auto</span>' : ''}</strong>
           ${match.esportsMatchId && ctx.settings.liveApi ? `<button type="button" class="btn btn-sm" data-autofill="${n}">⚡ Auto-fill</button>` : ''}
         </div>
         <div class="af-status muted small" data-af-status="${n}"></div>
@@ -318,6 +322,7 @@ function resultEditor(ctx, match) {
             durationSec,
             totalKills: killsText === '' ? null : Number(killsText),
           };
+          if (games[n - 1]?.auto) g.auto = true; // don't let the robot redo a game you checked
           out.push(Object.values(g).some((v) => v != null) ? g : null);
         }
         while (out.length && out[out.length - 1] === null) out.pop();
@@ -532,7 +537,10 @@ export const actions = {
   demoData(el, ctx) { return addDemoData(ctx); },
   async toggleActual(el, ctx) {
     const { field, code } = el.dataset;
-    const a = ctx.league.actual || {};
+    // Start from what's shown (automatic or corrected), then apply the correction.
+    const a = { ...(ctx.league.actual || {}) };
+    const shown = tournamentActual(ctx.league, ctx.state.matches);
+    for (const f of ['swiss30', 'swiss03', 'swissAdvance']) if (!a[f]?.length) a[f] = shown[f];
     const list = new Set(a[field] || []);
     if (list.has(code)) list.delete(code);
     else {
@@ -545,6 +553,16 @@ export const actions = {
       }
     }
     await ctx.save(ctx.paths.league(), { actual: { [field]: [...list] } });
+  },
+  async copyLeagueId() {
+    const input = document.getElementById('league-id');
+    input.select();
+    try { await navigator.clipboard.writeText(input.value); } catch { document.execCommand('copy'); }
+    toast('League ID copied', 'success');
+  },
+  async resetActual(el, ctx) {
+    await ctx.save(ctx.paths.league(), { actual: { swiss30: [], swiss03: [], swissAdvance: [] } });
+    toast('Back to automatic Swiss results', 'success');
   },
   editTeams(el, ctx) { teamsEditor(ctx); },
   editSettings(el, ctx) { settingsEditor(ctx); },
