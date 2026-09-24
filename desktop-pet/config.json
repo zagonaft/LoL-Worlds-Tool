@@ -1,0 +1,18 @@
+{
+  "sprite_sheet": "sprites/cat.png",
+  "columns": 4,
+  "rows": 8,
+  "size": 96,
+  "sprite_faces": "right",
+
+  "walk_around": true,
+  "walk_speed": 90,
+  "idle_seconds": [3, 8],
+
+  "animations": {
+    "idle":  { "row": 4, "start": 2, "frames": 2, "frame_ms": 700 },
+    "walk":  { "row": 1, "frames": 4, "frame_ms": 130 },
+    "react": { "row": 5, "frames": 4, "frame_ms": 250 },
+    "drag":  { "row": 7, "start": 2, "frames": 2, "frame_ms": 200 }
+  }
+}
