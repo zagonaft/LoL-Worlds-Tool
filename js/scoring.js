@@ -66,6 +66,22 @@ export function formatDuration(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// "3-1" (team A's view) → "KC 3–1": always name the team that wins.
+export function scoreLabel(match, score) {
+  const [a, b] = String(score).split('-').map(Number);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return String(score);
+  const winner = (a > b ? match.teamA : match.teamB) || 'TBD';
+  return `${winner} ${Math.max(a, b)}–${Math.min(a, b)}`;
+}
+
+// Does an exact-score pick agree with a winner / number-of-games pick?
+export function scoreAgrees(score, { winner, totalGames } = {}) {
+  const [a, b] = String(score).split('-').map(Number);
+  if (winner && winner !== (a > b ? 'A' : 'B')) return false;
+  if (totalGames && Number(totalGames) !== a + b) return false;
+  return true;
+}
+
 export function sideCode(match, side) {
   if (side === 'A') return match.teamA;
   if (side === 'B') return match.teamB;

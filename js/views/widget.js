@@ -3,7 +3,7 @@
 // score an admin entered in the app.
 import { getLiveSnapshot } from '../lolesports.js';
 import { esc, relTime, teamLogo } from '../ui.js';
-import { matchStatus } from '../scoring.js';
+import { matchStatus, scoreLabel } from '../scoring.js';
 
 const ui = {
   open: localStorage.getItem('lwt:widget:open') === '1',
@@ -80,7 +80,7 @@ function myPickLine(ctx, match) {
   const pick = ctx.state.picks.find((p) => p.matchId === match.id && p.playerId === ctx.me.id);
   if (!pick?.winner) return '';
   const code = pick.winner === 'A' ? match.teamA : match.teamB;
-  return `<div class="lw-pick">Your pick: <strong>${esc(code)}</strong>${pick.score ? ` ${esc(pick.score.replace('-', '–'))}` : ''}</div>`;
+  return `<div class="lw-pick">Your pick: <strong>${esc(code)}</strong>${pick.score ? ` · ${esc(scoreLabel(match, pick.score))}` : ''}</div>`;
 }
 
 function findOurMatch(ctx, snap) {

@@ -33,7 +33,7 @@ test('picks are revealed once the match locks', () => {
   ];
   const [post] = plan([m], picks);
   assert.match(post.content, /🔒 \*\*T1 vs GEN\*\*: bets are locked/);
-  assert.match(post.content, /\*\*Zag\*\*: T1 · 2–1 · 3 games\n {3}Game 1: FB GEN · 28–32m · Over 26\.5 kills \(\+ picks for 1 more game\)/);
+  assert.match(post.content, /\*\*Zag\*\*: T1 · T1 2–1 · 3 games\n {3}Game 1: FB GEN · 28–32m · Over 26\.5 kills \(\+ picks for 1 more game\)/);
   assert.match(post.content, /\*\*Alex\*\*: GEN/);
   assert.match(post.content, /\*\*Sam\*\*: no picks/);
   // Nobody picked: no reveal post.

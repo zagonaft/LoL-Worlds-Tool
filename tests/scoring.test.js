@@ -184,3 +184,14 @@ test('Swiss results are worked out from match results', async () => {
   const r = scorePredictions({ swiss30: ['KC'], swiss03: ['C9'] }, tournamentActual({}, matches), P);
   assert.deepEqual(r.items.map((i) => i.status), ['lost', 'lost']);
 });
+
+test('series scores always name the winning team', async () => {
+  const { scoreLabel, scoreAgrees } = await import('../js/scoring.js');
+  const m = { teamA: 'KC', teamB: 'C9' };
+  assert.equal(scoreLabel(m, '3-1'), 'KC 3–1');
+  assert.equal(scoreLabel(m, '1-3'), 'C9 3–1');
+  assert.equal(scoreLabel(m, '2-0'), 'KC 2–0');
+  assert.equal(scoreAgrees('3-1', { winner: 'B' }), false);
+  assert.equal(scoreAgrees('1-3', { winner: 'B', totalGames: 4 }), true);
+  assert.equal(scoreAgrees('1-3', { totalGames: 5 }), false);
+});
