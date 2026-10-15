@@ -8,7 +8,7 @@
 // nothing is posted twice. Scores go behind ||spoiler|| tags unless the league
 // turned that off.
 import { GAME_PROPS, STAGES } from '../js/defaults.js';
-import { scoreMatchPick, seriesResult, matchStatus, lengthLabels, formatDuration, killsResult, computeStandings } from '../js/scoring.js';
+import { scoreLabel, scoreMatchPick, seriesResult, matchStatus, lengthLabels, formatDuration, killsResult, computeStandings } from '../js/scoring.js';
 
 export const LOL_ESPORTS_YOUTUBE = 'UCvqRdlKsE5Q8mf8YXbdIJLw';
 
@@ -44,7 +44,7 @@ function pickSummary(match, pick, settings) {
   if (!pick || (!pick.winner && !hasGames)) return 'no picks 😬';
   const parts = [];
   if (pick.winner) parts.push(code(match, pick.winner));
-  if (match.bestOf > 1 && pick.score) parts.push(pick.score.replace('-', '–'));
+  if (match.bestOf > 1 && pick.score) parts.push(scoreLabel(match, pick.score));
   if (match.bestOf > 1 && pick.totalGames) parts.push(`${pick.totalGames} games`);
   let line = parts.join(' · ') || 'no winner picked';
   const g1 = pick.games?.[1] || {};

@@ -4,7 +4,7 @@ import { GAME_PROPS, STAGES, SLOT_LABELS } from '../defaults.js';
 import { esc, fmtDay, fmtTime, dayKey, relTime, teamLogo, playerDot, toast } from '../ui.js';
 import {
   matchStatus, isMatchOpen, scoreMatchPick, seriesScores, possibleTotals, lengthLabels,
-  sideCode, seriesResult, gameActual,
+  sideCode, seriesResult, gameActual, scoreLabel, scoreAgrees,
 } from '../scoring.js';
 
 const ui = {
@@ -37,7 +37,7 @@ export function pickLabel(ctx, match, key, value) {
     case 'firstBaron':
       return value === 'none' ? 'None' : code(ctx, match, value);
     case 'score':
-      return String(value).replace('-', '–');
+      return scoreLabel(match, value);
     case 'totalGames':
       return `${value} games`;
     case 'length':
@@ -62,7 +62,7 @@ function optionsFor(ctx, match, key) {
     case 'firstBaron':
       return [['A', A], ['B', B], ['none', 'None']];
     case 'score':
-      return seriesScores(match.bestOf).map((sc) => [sc, sc.replace('-', '–')]);
+      return seriesScores(match.bestOf).map((sc) => [sc, scoreLabel(match, sc)]);
     case 'totalGames':
       return possibleTotals(match.bestOf).map((n) => [n, String(n)]);
     case 'length':
@@ -329,11 +329,17 @@ export const actions = {
     const patch = { matchId: mid, playerId: ctx.me.id, updatedAt: Date.now() };
     if (game) patch.games = { [game]: { [key]: value } };
     else patch[key] = value;
-    // Picking an exact score also fills in the winner and number of games (if not picked yet).
+    // Keep winner, exact score and number of games consistent with each other:
+    // an exact score sets the other two, and changing either of those clears a
+    // score that no longer fits.
     if (key === 'score' && value) {
       const [a, b] = value.split('-').map(Number);
-      if (!existing?.winner) patch.winner = a > b ? 'A' : 'B';
-      if (!existing?.totalGames) patch.totalGames = a + b;
+      patch.winner = a > b ? 'A' : 'B';
+      patch.totalGames = a + b;
+    } else if ((key === 'winner' || key === 'totalGames') && value != null && existing?.score
+      && !scoreAgrees(existing.score, { [key]: value })) {
+      patch.score = null;
+      toast('Exact score cleared because it no longer matches. Pick it again.', 'info');
     }
     await ctx.save(ctx.paths.pick(mid, ctx.me.id), patch);
   },
