@@ -3,6 +3,20 @@ import { getScheduleEvents, eventToMatch } from './lolesports.js';
 
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+// Picks are saved as "team A / team B", so a team must never change sides once
+// it's known. LoL Esports sometimes lists the same match the other way round
+// (e.g. FUR vs MVK becomes MVK vs FUR): flip their data back to our order.
+export function keepSides(ev, existing, canonical = (c) => c) {
+  if (!existing) return ev;
+  const known = (c) => c && c !== 'TBD';
+  const a = canonical(ev.teamA.code);
+  const b = canonical(ev.teamB.code);
+  const agree = (known(a) && a === existing.teamA) + (known(b) && b === existing.teamB);
+  const flipped = (known(a) && a === existing.teamB) + (known(b) && b === existing.teamA);
+  if (flipped <= agree) return ev;
+  return { ...ev, teamA: ev.teamB, teamB: ev.teamA, scoreA: ev.scoreB, scoreB: ev.scoreA };
+}
+
 export async function syncSchedule({ store, paths, league, matches }) {
   const events = (await getScheduleEvents(league.settings.scheduleSinceMs)).map(eventToMatch);
   let created = 0;
@@ -34,8 +48,9 @@ export async function syncSchedule({ store, paths, league, matches }) {
   }
 
   // 3) Matches.
-  for (const ev of events) {
-    const existing = matches.find((m) => m.esportsMatchId === ev.esportsMatchId);
+  for (const raw of events) {
+    const existing = matches.find((m) => m.esportsMatchId === raw.esportsMatchId);
+    const ev = keepSides(raw, existing, canonical);
     const id = existing?.id || `lol_${ev.esportsMatchId}`;
     const patch = {
       esportsMatchId: ev.esportsMatchId,
