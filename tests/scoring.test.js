@@ -195,3 +195,25 @@ test('series scores always name the winning team', async () => {
   assert.equal(scoreAgrees('1-3', { winner: 'B', totalGames: 4 }), true);
   assert.equal(scoreAgrees('1-3', { totalGames: 5 }), false);
 });
+
+test('picks follow the team they were made for, even if the match flips', async () => {
+  const { alignPick, scoreMatchPick: score } = await import('../js/scoring.js');
+  const pick = { teams: { A: 'FUR', B: 'MVK' }, winner: 'A', score: '3-1', games: { 1: { firstBlood: 'B', firstBaron: 'none', length: 2 } } };
+  const flipped = { id: 'm', teamA: 'MVK', teamB: 'FUR', bestOf: 5, result: { status: 'final', scoreA: 1, scoreB: 3, games: [{ winner: 'B', firstBlood: 'A', firstBaron: 'none', durationSec: 2000 }] } };
+  const a = alignPick(flipped, pick);
+  assert.equal(a.winner, 'B'); // FUR is now team B
+  assert.equal(a.score, '1-3'); // still "FUR 3–1"
+  assert.deepEqual(a.games[1], { firstBlood: 'A', firstBaron: 'none', length: 2 }); // MVK first blood
+  assert.equal(alignPick({ teamA: 'FUR', teamB: 'MVK' }, pick), pick); // same order: untouched
+  assert.equal(alignPick(flipped, { winner: 'A' }).winner, 'A'); // old picks without teams: untouched
+  // FUR won 3-1, MVK got first blood, no baron, 33 min: winner, score, first blood, baron and length all win.
+  const r = score(flipped, pick, S);
+  assert.equal(r.points, P.winner + P.score + P.firstBlood + P.firstBaron + P.length);
+});
+
+test('version.json matches the app version (bump both together)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { APP_VERSION } = await import('../js/version.js');
+  const { version } = JSON.parse(readFileSync(new URL('../version.json', import.meta.url)));
+  assert.equal(version, APP_VERSION);
+});

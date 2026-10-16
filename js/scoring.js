@@ -82,6 +82,33 @@ export function scoreAgrees(score, { winner, totalGames } = {}) {
   return true;
 }
 
+// Picks remember which team was on each side when they were made
+// (pick.teams = { A: 'FUR', B: 'MVK' }). If the match's teams are the other way
+// round now, read the pick flipped, so it always counts for the team chosen.
+const SIDE_BETS = new Set(['firstBlood', 'firstDragon', 'firstTower', 'firstBaron']);
+const flipSide = (v) => (v === 'A' ? 'B' : v === 'B' ? 'A' : v);
+
+export function pickTeams(match) {
+  const known = (c) => c && c !== 'TBD';
+  return known(match?.teamA) && known(match?.teamB) ? { A: match.teamA, B: match.teamB } : null;
+}
+
+export function alignPick(match, pick) {
+  const t = pick?.teams;
+  if (!t || !match || t.A !== match.teamB || t.B !== match.teamA || t.A === t.B) return pick;
+  const games = {};
+  for (const [n, g] of Object.entries(pick.games || {})) {
+    games[n] = Object.fromEntries(Object.entries(g || {}).map(([k, v]) => [k, SIDE_BETS.has(k) ? flipSide(v) : v]));
+  }
+  return {
+    ...pick,
+    winner: flipSide(pick.winner),
+    score: pick.score ? String(pick.score).split('-').reverse().join('-') : pick.score,
+    games,
+    teams: { A: t.B, B: t.A },
+  };
+}
+
 export function sideCode(match, side) {
   if (side === 'A') return match.teamA;
   if (side === 'B') return match.teamB;
@@ -135,6 +162,7 @@ export function scoreMatchPick(match, pick, settings) {
   const P = settings.points;
   const items = [];
   if (!match || !pick) return summarize(items);
+  pick = alignPick(match, pick);
   const sr = seriesResult(match);
 
   if (pick.winner) items.push(item('winner', 'series', pick.winner, sr?.winner ?? null, resolve(pick.winner, sr?.winner), P.winner));
