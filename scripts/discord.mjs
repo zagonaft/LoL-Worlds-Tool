@@ -8,7 +8,7 @@
 // nothing is posted twice. Scores go behind ||spoiler|| tags unless the league
 // turned that off.
 import { GAME_PROPS, STAGES } from '../js/defaults.js';
-import { scoreLabel, scoreMatchPick, seriesResult, matchStatus, lengthLabels, formatDuration, killsResult, computeStandings } from '../js/scoring.js';
+import { alignPick, scoreLabel, scoreMatchPick, seriesResult, matchStatus, lengthLabels, formatDuration, killsResult, computeStandings } from '../js/scoring.js';
 
 export const LOL_ESPORTS_YOUTUBE = 'UCvqRdlKsE5Q8mf8YXbdIJLw';
 
@@ -87,7 +87,7 @@ export function planDiscordPosts({ settings, matches, players, picks, prediction
     const title = `**${escapeMd(m.teamA)} vs ${escapeMd(m.teamB)}**`;
     const where = [stageText(m), `Bo${m.bestOf}`].filter(Boolean).join(' · ');
     const since = now - m.startMs;
-    const matchPicks = new Map(players.map((p) => [p.id, picks.find((x) => x.matchId === m.id && x.playerId === p.id)]));
+    const matchPicks = new Map(players.map((p) => [p.id, alignPick(m, picks.find((x) => x.matchId === m.id && x.playerId === p.id))]));
 
     // ⏰ Reminder
     if (!posted.reminder && status === 'open' && m.startMs - now <= REMINDER_BEFORE) {

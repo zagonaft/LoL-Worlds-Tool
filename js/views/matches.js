@@ -4,7 +4,7 @@ import { GAME_PROPS, STAGES, SLOT_LABELS } from '../defaults.js';
 import { esc, fmtDay, fmtTime, dayKey, relTime, teamLogo, playerDot, toast } from '../ui.js';
 import {
   matchStatus, isMatchOpen, scoreMatchPick, seriesScores, possibleTotals, lengthLabels,
-  sideCode, seriesResult, gameActual, scoreLabel, scoreAgrees,
+  sideCode, seriesResult, gameActual, scoreLabel, scoreAgrees, alignPick, pickTeams,
 } from '../scoring.js';
 
 const ui = {
@@ -153,7 +153,7 @@ const STATUS_ICON = { won: '✓', lost: '✗', void: '∅', pending: '' };
 function compareTable(ctx, match) {
   const players = ctx.state.players;
   const s = ctx.settings;
-  const picks = new Map(players.map((p) => [p.id, ctx.state.picks.find((x) => x.matchId === match.id && x.playerId === p.id)]));
+  const picks = new Map(players.map((p) => [p.id, alignPick(match, ctx.state.picks.find((x) => x.matchId === match.id && x.playerId === p.id))]));
   const scored = new Map(players.map((p) => [p.id, scoreMatchPick(match, picks.get(p.id), s)]));
   const sr = seriesResult(match);
   const games = match.result?.games || [];
@@ -211,7 +211,7 @@ function card(ctx, match) {
   // Expand what needs attention: live matches and ones starting within 48 hours.
   const defaultExpanded = status === 'live' || (open && match.startMs - Date.now() < 48 * 3600000);
   const expanded = ui.toggled.has(match.id) ? !defaultExpanded : defaultExpanded;
-  const mine = ctx.state.picks.find((x) => x.matchId === match.id && x.playerId === ctx.me.id);
+  const mine = myPick(ctx, match.id);
   const my = scoreMatchPick(match, mine, ctx.settings);
   const sr = seriesResult(match);
   const showScore = status === 'live' || status === 'final';
@@ -296,7 +296,21 @@ export function html(ctx) {
 // ---------- actions ----------
 
 function myPick(ctx, matchId) {
-  return ctx.state.picks.find((p) => p.matchId === matchId && p.playerId === ctx.me.id);
+  const match = ctx.state.matches.find((m) => m.id === matchId);
+  return alignPick(match, ctx.state.picks.find((p) => p.matchId === matchId && p.playerId === ctx.me.id));
+}
+
+// Before changing a pick that was saved with the teams the other way round,
+// rewrite it in the match's current order so old and new picks don't mix.
+async function saveMyPick(ctx, match, patch) {
+  const raw = ctx.state.picks.find((p) => p.matchId === match.id && p.playerId === ctx.me.id);
+  const aligned = alignPick(match, raw);
+  const teams = pickTeams(match);
+  if (raw && aligned !== raw) {
+    const { id, ...doc } = aligned;
+    if (!(await ctx.save(ctx.paths.pick(match.id, ctx.me.id), doc, { merge: false }))) return false;
+  }
+  return ctx.save(ctx.paths.pick(match.id, ctx.me.id), teams ? { ...patch, teams } : patch);
 }
 
 export const actions = {
@@ -341,7 +355,7 @@ export const actions = {
       patch.score = null;
       toast('Exact score cleared because it no longer matches. Pick it again.', 'info');
     }
-    await ctx.save(ctx.paths.pick(mid, ctx.me.id), patch);
+    await saveMyPick(ctx, match, patch);
   },
   async copyG1(el, ctx) {
     const match = ctx.state.matches.find((m) => m.id === el.dataset.mid);
@@ -352,7 +366,7 @@ export const actions = {
     }
     const games = {};
     for (let n = 2; n <= match.bestOf; n++) games[n] = { ...g1 };
-    const ok = await ctx.save(ctx.paths.pick(match.id, ctx.me.id), { matchId: match.id, playerId: ctx.me.id, games, updatedAt: Date.now() });
+    const ok = await saveMyPick(ctx, match, { matchId: match.id, playerId: ctx.me.id, games, updatedAt: Date.now() });
     if (ok) toast('Copied to all games', 'success');
   },
 };

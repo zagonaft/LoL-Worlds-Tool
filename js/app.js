@@ -1,5 +1,6 @@
 // App entry point: loads the league, keeps live subscriptions, routes between views.
 import { FIREBASE_CONFIG } from './config.js';
+import { APP_VERSION } from './version.js';
 import { createStore } from './store.js';
 import { DEFAULT_TEAMS, DEFAULT_SETTINGS, DEFAULT_POINTS, TOURNAMENT_NAME } from './defaults.js';
 import { esc, uid, toast, openModal, playerDot } from './ui.js';
@@ -340,7 +341,30 @@ function subscribe() {
   store.watchCol(paths.brackets(), (docs) => { state.brackets = docs; done('brackets'); });
 }
 
+// Auto-update: every few minutes (and when the app comes back to the
+// foreground) fetch the tiny version.json. If a newer version is online,
+// reload, but never while someone is typing or has a dialog open.
+async function checkForUpdate() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const { version } = await res.json();
+    if (!version || version === APP_VERSION) return;
+    // Don't loop if the browser still serves cached old code right after a reload.
+    const key = 'lwt:reloadedFor';
+    const last = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (last?.version === version && Date.now() - last.at < 15 * 60000) return;
+    const busy = document.activeElement?.matches?.('input, textarea, select') || document.querySelector('.modal-backdrop');
+    if (busy) return;
+    sessionStorage.setItem(key, JSON.stringify({ version, at: Date.now() }));
+    location.reload();
+  } catch { /* offline: try again later */ }
+}
+
 function startTimers() {
+  setInterval(checkForUpdate, 5 * 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+
   // Refresh countdowns and lock states, unless someone is typing.
   setInterval(() => {
     const typing = document.activeElement?.matches?.('input, textarea, select');
