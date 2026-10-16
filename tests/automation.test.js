@@ -144,3 +144,23 @@ test('winner guesses that contradict the final score are dropped', async () => {
   // Game 3 is the decider → KC for sure; games 1-2 can't both be GEN, so the guesses are dropped.
   assert.deepEqual(winners, [null, null, 'B']);
 });
+
+test('sync never swaps which side a team is on', async () => {
+  const { syncSchedule, keepSides } = await import('../js/sync.js');
+  const ev = (a, b, sa, sb) => ({ startTime: new Date(Date.now() - 3600e3).toISOString(), state: 'inProgress', blockName: 'Play-In',
+    match: { id: 'x9', strategy: { count: 5 }, teams: [{ code: a, name: a, result: { gameWins: sa } }, { code: b, name: b, result: { gameWins: sb } }] } });
+  // LoL Esports now lists MVK first, we had FUR first; MVK leads 1-0.
+  globalThis.fetch = async () => Response.json({ data: { schedule: { pages: {}, events: [ev('MVK', 'FUR', 1, 0)] } } });
+  const writes = [];
+  const store = { async set(path, data) { writes.push(data); } };
+  const league = { teams: [{ code: 'FUR' }, { code: 'MVK' }], settings: { scheduleSinceMs: 0 } };
+  const existing = { id: 'lol_x9', esportsMatchId: 'x9', teamA: 'FUR', teamB: 'MVK', bestOf: 5, result: { status: 'live', scoreA: 0, scoreB: 0 } };
+  await syncSchedule({ store, paths: leaguePaths('L'), league, matches: [existing] });
+  assert.equal(writes[0].teamA, 'FUR');
+  assert.equal(writes[0].teamB, 'MVK');
+  assert.deepEqual([writes[0].result.scoreA, writes[0].result.scoreB], [0, 1]);
+  assert.deepEqual(writes[0].result.gameWinners, { 1: 'B' });
+  // TBD becoming a real team is not a swap.
+  const filled = keepSides({ teamA: { code: 'KC' }, teamB: { code: 'MVK' }, scoreA: 0, scoreB: 0 }, { teamA: 'TBD', teamB: 'TBD' });
+  assert.equal(filled.teamA.code, 'KC');
+});
