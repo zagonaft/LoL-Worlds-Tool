@@ -350,7 +350,7 @@ async function checkForUpdate() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return;
-    const { version } = await res.json();
+    const { version, files = [] } = await res.json();
     if (!version || version === APP_VERSION) return;
     // Don't loop if the browser still serves cached old code right after a reload.
     const key = 'lwt:reloadedFor';
@@ -359,6 +359,9 @@ async function checkForUpdate() {
     const busy = document.activeElement?.matches?.('input, textarea, select') || document.querySelector('.modal-backdrop');
     if (busy) return;
     sessionStorage.setItem(key, JSON.stringify({ version, at: Date.now() }));
+    // Pull fresh copies of every file into the browser cache first, or the
+    // reload can come back with the old code.
+    await Promise.all(files.map((f) => fetch(f, { cache: 'reload' }).catch(() => {})));
     location.reload();
   } catch { /* offline: try again later */ }
 }

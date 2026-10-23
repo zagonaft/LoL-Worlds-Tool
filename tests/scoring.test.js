@@ -216,4 +216,11 @@ test('version.json matches the app version (bump both together)', async () => {
   const { APP_VERSION } = await import('../js/version.js');
   const { version } = JSON.parse(readFileSync(new URL('../version.json', import.meta.url)));
   assert.equal(version, APP_VERSION);
+  // Every app file must be listed, so updates refresh it in the browser cache.
+  const { files } = JSON.parse(readFileSync(new URL('../version.json', import.meta.url)));
+  const { readdirSync } = await import('node:fs');
+  const onDisk = ['index.html', 'css/styles.css',
+    ...readdirSync(new URL('../js', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`),
+    ...readdirSync(new URL('../js/views', import.meta.url)).map((f) => `js/views/${f}`)];
+  assert.deepEqual([...files].sort(), onDisk.sort());
 });
