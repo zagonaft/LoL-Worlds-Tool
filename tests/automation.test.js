@@ -164,3 +164,15 @@ test('sync never swaps which side a team is on', async () => {
   const filled = keepSides({ teamA: { code: 'KC' }, teamB: { code: 'MVK' }, scoreA: 0, scoreB: 0 }, { teamA: 'TBD', teamB: 'TBD' });
   assert.equal(filled.teamA.code, 'KC');
 });
+
+test('a series counts as final as soon as a team has enough wins', async () => {
+  const { syncSchedule } = await import('../js/sync.js');
+  const ev = (count, a, b) => ({ startTime: new Date(Date.now() - 3600e3).toISOString(), state: 'inProgress', blockName: 'Swiss',
+    match: { id: `c${count}${a}${b}`, strategy: { count }, teams: [{ code: 'GEN', name: 'GEN', result: { gameWins: a } }, { code: 'IG', name: 'IG', result: { gameWins: b } }] } });
+  globalThis.fetch = async () => Response.json({ data: { schedule: { pages: {}, events: [ev(1, 1, 0), ev(3, 1, 1), ev(3, 0, 2), ev(5, 2, 2)] } } });
+  const writes = [];
+  const store = { async set(path, data) { writes.push(data.result.status); } };
+  const league = { teams: [{ code: 'GEN' }, { code: 'IG' }], settings: { scheduleSinceMs: 0 } };
+  await syncSchedule({ store, paths: leaguePaths('L'), league, matches: [] });
+  assert.deepEqual(writes, ['final', 'live', 'final', 'live']);
+});
