@@ -224,3 +224,28 @@ test('version.json matches the app version (bump both together)', async () => {
     ...readdirSync(new URL('../js/views', import.meta.url)).map((f) => `js/views/${f}`)];
   assert.deepEqual([...files].sort(), onDisk.sort());
 });
+
+test('team history: records, game by game, and who is still in', async () => {
+  const { teamHistory } = await import('../js/scoring.js');
+  const fin = (id, stage, a, b, sa, sb, extra = {}) => ({ id, stage, teamA: a, teamB: b, bestOf: sa + sb > 1 ? 5 : 1, startMs: Number(id.slice(1)),
+    result: { status: 'final', scoreA: sa, scoreB: sb, ...extra } });
+  const matches = [
+    fin('m1', 'playin', 'KC', 'C9', 3, 2, { games: [{ winner: 'B', firstBlood: 'A' }], gameWinners: { 2: 'A' } }),
+    fin('m2', 'swiss', 'KC', 'GEN', 0, 1),
+    fin('m3', 'swiss', 'GEN', 'T1', 1, 0),
+    { id: 'm4', stage: 'swiss', teamA: 'T1', teamB: 'KC', startMs: 4, result: { status: 'live', scoreA: 0, scoreB: 0 } },
+    { id: 'm5', stage: 'swiss', teamA: 'TBD', teamB: 'TBD', startMs: 5, result: null },
+  ];
+  const rows = teamHistory(matches, { eliminated: new Set(['T1']) });
+  const by = Object.fromEntries(rows.map((r) => [r.code, r]));
+  assert.deepEqual(rows.map((r) => r.code), ['GEN', 'KC', 'C9', 'T1']); // C9 and T1 tie (0-1, -1 games): A to Z
+  assert.deepEqual([by.KC.series, by.KC.games], [{ w: 1, l: 1 }, { w: 3, l: 3 }]);
+  assert.equal(by.KC.list.length, 3); // the live series is listed but not counted
+  assert.equal(by.KC.list[2].live, true);
+  // Game by game from each team's side: C9 won game 1, KC game 2, the rest unknown.
+  assert.deepEqual(by.KC.list[0].games.map((g) => g.won), [false, true, null, null, null]);
+  assert.deepEqual(by.C9.list[0].games.map((g) => g.won), [true, false, null, null, null]);
+  assert.equal(by.KC.list[0].games[0].game.firstBlood, 'A');
+  // C9 only played the Play-In and the Swiss has started: out. T1 is eliminated.
+  assert.deepEqual([by.C9.out, by.T1.out, by.KC.out, by.GEN.out], [true, true, false, false]);
+});

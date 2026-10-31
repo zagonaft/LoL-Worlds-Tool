@@ -344,6 +344,55 @@ export function tournamentActual(league, matches) {
   };
 }
 
+// Every team's results: series and game records, plus each series game by game.
+// Only finished series count towards the records; a live one is listed too.
+export function teamHistory(matches, actual = {}) {
+  const teams = new Map();
+  const get = (code) => {
+    if (!teams.has(code)) teams.set(code, { code, series: { w: 0, l: 0 }, games: { w: 0, l: 0 }, list: [] });
+    return teams.get(code);
+  };
+  const played = matches
+    .filter((m) => ['live', 'final'].includes(m.result?.status) && m.teamA && m.teamB && m.teamA !== 'TBD' && m.teamB !== 'TBD')
+    .sort((x, y) => Number(x.startMs) - Number(y.startMs));
+  for (const m of played) {
+    const r = m.result;
+    const sr = seriesResult(m);
+    for (const side of ['A', 'B']) {
+      const other = side === 'A' ? 'B' : 'A';
+      const t = get(sideCode(m, side));
+      const scoreFor = Number(r[`score${side}`]) || 0;
+      const scoreAgainst = Number(r[`score${other}`]) || 0;
+      const games = [];
+      for (let n = 1; n <= scoreFor + scoreAgainst; n++) {
+        const g = r.games?.[n - 1] || {};
+        const winner = g.winner || r.gameWinners?.[n] || null;
+        games.push({ n, won: winner ? winner === side : null, game: g });
+      }
+      const won = sr ? sr.winner === side : null;
+      if (sr) {
+        t.series[won ? 'w' : 'l']++;
+        t.games.w += scoreFor;
+        t.games.l += scoreAgainst;
+      }
+      t.list.push({ match: m, side, opponent: sideCode(m, other), live: !sr, won, scoreFor, scoreAgainst, games });
+    }
+  }
+  const eliminated = actual.eliminated || new Set();
+  // Play-In teams that never reached the Swiss stage are out once it has started.
+  const swissStarted = played.some((m) => m.stage === 'swiss');
+  const inSwiss = new Set(played.filter((m) => m.stage === 'swiss').flatMap((m) => [m.teamA, m.teamB]));
+  const rows = [...teams.values()].map((t) => ({
+    ...t,
+    champion: actual.champion === t.code,
+    out: eliminated.has(t.code) || (swissStarted && !inSwiss.has(t.code) && t.list.every((x) => x.match.stage === 'playin')),
+  }));
+  rows.sort((x, y) => Number(y.champion) - Number(x.champion) || Number(x.out) - Number(y.out)
+    || y.series.w - x.series.w || x.series.l - y.series.l
+    || (y.games.w - y.games.l) - (x.games.w - x.games.l) || x.code.localeCompare(y.code));
+  return rows;
+}
+
 export function computeStandings({ players, matches, picks, predictions, brackets, league, settings }) {
   const matchById = new Map(matches.map((m) => [m.id, m]));
   const actual = tournamentActual(league, matches);
