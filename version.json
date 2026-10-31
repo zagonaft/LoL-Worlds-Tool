@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-23.3",
+  "version": "2026-10-31.1",
   "files": [
     "index.html",
     "css/styles.css",
@@ -16,6 +16,7 @@
     "js/views/admin.js",
     "js/views/bracket.js",
     "js/views/help.js",
+    "js/views/history.js",
     "js/views/login.js",
     "js/views/matches.js",
     "js/views/standings.js",

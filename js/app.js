@@ -9,6 +9,7 @@ import { runAutomation } from './automation.js';
 import * as matchesView from './views/matches.js';
 import * as bracketView from './views/bracket.js';
 import * as treeView from './views/tree.js';
+import * as historyView from './views/history.js';
 import * as standingsView from './views/standings.js';
 import * as helpView from './views/help.js';
 import * as adminView from './views/admin.js';
@@ -20,6 +21,7 @@ const VIEWS = {
   bracket: { title: 'Bracket', view: bracketView },
   tree: { title: 'Bracket Tree', view: treeView },
   standings: { title: 'Standings', view: standingsView },
+  history: { title: 'History', view: historyView },
   help: { title: 'Help', view: helpView },
   admin: { title: 'Admin', view: adminView, adminOnly: true },
 };
