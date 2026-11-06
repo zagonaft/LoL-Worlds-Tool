@@ -54,11 +54,15 @@ service cloud.firestore {
           && openUntil(leagueData().get('settings', {}).get('predictionsLockMs', null));
       }
 
-      // Knockout bracket. Locked at settings.knockoutLockMs.
+      // Knockout bracket. Locked at settings.knockoutLockMs, except for players an
+      // admin let in late (settings.lateBracket): the app only lets them pick
+      // slots whose match hasn't started.
       match /brackets/{playerId} {
         allow read, delete: if validLeague();
         allow create, update: if validLeague()
-          && openUntil(leagueData().get('settings', {}).get('knockoutLockMs', null));
+          && (openUntil(leagueData().get('settings', {}).get('knockoutLockMs', null))
+            || (playerId in leagueData().get('settings', {}).get('lateBracket', {}).get('players', [])
+              && openUntil(leagueData().get('settings', {}).get('lateBracket', {}).get('untilMs', null))));
       }
     }
   }

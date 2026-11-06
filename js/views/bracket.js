@@ -1,7 +1,7 @@
 // Bracket: tournament-wide predictions (champion + Swiss pick'em) and the knockout bracket.
 import { BRACKET_SLOTS, SLOT_LABELS, REGIONS } from '../defaults.js';
 import { esc, fmtDateTime, relTime, teamLogo, playerDot } from '../ui.js';
-import { scorePredictions, scoreBracket, tournamentActual, FEEDERS, slotPointsKey } from '../scoring.js';
+import { scorePredictions, scoreBracket, tournamentActual, FEEDERS, slotPointsKey, predictedTeams, bracketSlotOpen, lateBracketPlayer } from '../scoring.js';
 
 const PRED_FIELDS = [
   { field: 'champion', label: 'World champion', count: 1, pointsKey: 'champion' },
@@ -91,14 +91,10 @@ function predictionsSection(ctx, actual) {
     </section>`;
 }
 
-// Which two teams a player expects in each slot, following their own picks.
-function predictedTeams(bs, picks, slot) {
-  if (!FEEDERS[slot]) return bs[slot].teams;
-  const [f1, f2] = FEEDERS[slot];
-  return [picks[f1] || null, picks[f2] || null];
-}
+const slotOpen = (ctx, bs, slot) => bracketSlotOpen({ settings: ctx.settings, matches: ctx.state.matches, bstate: bs, playerId: ctx.me.id, slot });
 
-function slotBox(ctx, bs, picks, slot, open) {
+function slotBox(ctx, bs, picks, slot) {
+  const open = slotOpen(ctx, bs, slot);
   const teams = predictedTeams(bs, picks, slot);
   const actualWinner = bs[slot].winner;
   const eliminated = new Set(Object.values(bs).map((s) => s.loser).filter(Boolean));
@@ -125,12 +121,13 @@ function bracketSection(ctx, actual) {
   const bs = actual.bstate;
   const lockMs = ctx.settings.knockoutLockMs;
   const open = isOpen(lockMs);
+  const late = !open && lateBracketPlayer(ctx.settings, ctx.me.id);
   const picks = ctx.state.brackets.find((b) => b.id === ctx.me.id)?.picks || {};
   const hasQF = ['QF1', 'QF2', 'QF3', 'QF4'].some((s) => bs[s].teams.some(Boolean));
   const head = `
     <div class="card-head">
       <div><h2>Knockout bracket</h2><p class="muted small">Pick every winner from the quarterfinals to the final.</p></div>
-      ${lockPill(lockMs)}
+      ${late ? '<span class="pill pill-open">Open for you · each pick locks when its match starts</span>' : lockPill(lockMs)}
     </div>`;
   if (!hasQF) {
     return `<section class="card">${head}
@@ -141,9 +138,9 @@ function bracketSection(ctx, actual) {
   const champ = picks.F ? ctx.team(picks.F) : null;
   const tree = `
     <div class="bracket">
-      <div class="round"><h4>Quarterfinals</h4>${['QF1', 'QF2', 'QF3', 'QF4'].map((s) => slotBox(ctx, bs, picks, s, open)).join('')}</div>
-      <div class="round"><h4>Semifinals</h4>${['SF1', 'SF2'].map((s) => slotBox(ctx, bs, picks, s, open)).join('')}</div>
-      <div class="round"><h4>Final</h4>${slotBox(ctx, bs, picks, 'F', open)}
+      <div class="round"><h4>Quarterfinals</h4>${['QF1', 'QF2', 'QF3', 'QF4'].map((s) => slotBox(ctx, bs, picks, s)).join('')}</div>
+      <div class="round"><h4>Semifinals</h4>${['SF1', 'SF2'].map((s) => slotBox(ctx, bs, picks, s)).join('')}</div>
+      <div class="round"><h4>Final</h4>${slotBox(ctx, bs, picks, 'F')}
         <div class="champion ${champ ? '' : 'empty'}">${champ ? `${teamLogo(champ, 'lg')}<strong>${esc(champ.code)}</strong><span class="muted small">your champion</span>` : '<span class="muted">Your champion appears here</span>'}</div>
       </div>
     </div>`;
@@ -195,9 +192,9 @@ export const changes = {
 
 export const actions = {
   async bracketPick(el, ctx) {
-    if (!isOpen(ctx.settings.knockoutLockMs)) return;
     const { slot, code } = el.dataset;
     const bs = tournamentActual(ctx.league, ctx.state.matches).bstate;
+    if (!slotOpen(ctx, bs, slot)) return;
     const picks = { ...(ctx.state.brackets.find((b) => b.id === ctx.me.id)?.picks || {}) };
     if (picks[slot] === code) delete picks[slot]; else picks[slot] = code;
     // Changing an early pick can invalidate later ones.

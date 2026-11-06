@@ -213,8 +213,15 @@ export function bracketState(matches) {
     let teams = [null, null];
     if (m) teams = [m.teamA || null, m.teamB || null].map((c) => (c && c !== 'TBD' ? c : null));
     if (FEEDERS[slot]) {
-      const [f1, f2] = FEEDERS[slot];
-      teams = [teams[0] || state[f1]?.winner || null, teams[1] || state[f2]?.winner || null];
+      // Keep each team on its feeder's side: LoL Esports may list the match the
+      // other way round (e.g. "TBD vs BLG" when BLG came from the top quarterfinal).
+      const listed = teams.filter(Boolean);
+      teams = FEEDERS[slot].map((f) => state[f]?.winner || null);
+      for (const code of listed) {
+        if (teams.includes(code)) continue;
+        const free = teams.indexOf(null);
+        if (free >= 0) teams[free] = code;
+      }
     }
     const sr = m ? seriesResult(m) : null;
     const winner = sr ? sideCode(m, sr.winner) : null;
@@ -222,6 +229,28 @@ export function bracketState(matches) {
     state[slot] = { matchId: m?.id ?? null, teams, winner, loser };
   }
   return state;
+}
+
+// Teams a player expects in a slot: their own pick for each feeder, else the
+// real team once it's known (late pickers never picked the played quarterfinals).
+export function predictedTeams(bstate, picks, slot) {
+  if (!FEEDERS[slot]) return bstate[slot].teams;
+  return FEEDERS[slot].map((f, i) => picks[f] || bstate[slot].teams[i] || null);
+}
+
+// Players an admin let in after the bracket locked (settings.lateBracket.players)
+// may still pick each slot until its match starts.
+export function lateBracketPlayer(settings, playerId, now = Date.now()) {
+  const lb = settings?.lateBracket;
+  return !!lb && (lb.players || []).includes(playerId) && (lb.untilMs == null || now < lb.untilMs);
+}
+
+export function bracketSlotOpen({ settings, matches, bstate, playerId, slot, now = Date.now() }) {
+  const lock = settings?.knockoutLockMs;
+  if (lock == null || now < lock) return true;
+  if (!lateBracketPlayer(settings, playerId, now) || bstate[slot].winner) return false;
+  const m = matches.find((x) => x.id === bstate[slot].matchId);
+  return !m || (!m.locked && now < Number(m.startMs) && !['live', 'final'].includes(m.result?.status));
 }
 
 export function knockoutEliminated(bstate) {

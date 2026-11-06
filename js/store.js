@@ -9,6 +9,8 @@
 //   remove(path) → Promise
 // Documents are plain objects; collection callbacks receive [{ id, ...data }].
 
+import { lateBracketPlayer } from './scoring.js';
+
 const FIREBASE_VERSION = '12.19.0';
 
 export async function createStore(config) {
@@ -133,7 +135,8 @@ function createLocalStore() {
     const lockKey = parts[2] === 'predictions' ? 'predictionsLockMs' : parts[2] === 'brackets' ? 'knockoutLockMs' : null;
     if (lockKey) {
       const ms = league?.settings?.[lockKey];
-      if (ms != null && !(Date.now() < ms)) throw denied();
+      const late = lockKey === 'knockoutLockMs' && lateBracketPlayer(league?.settings, parts[3]);
+      if (ms != null && !(Date.now() < ms) && !late) throw denied();
     }
   };
 
