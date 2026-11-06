@@ -1,7 +1,7 @@
 // Bracket tree: the knockout stage drawn as a classic elimination bracket.
 // Shows the real results, or any player's predicted bracket on the same tree.
 import { esc, teamLogo, playerDot } from '../ui.js';
-import { scoreBracket, tournamentActual, FEEDERS, matchStatus, slotPointsKey } from '../scoring.js';
+import { scoreBracket, tournamentActual, FEEDERS, matchStatus, slotPointsKey, predictedTeams } from '../scoring.js';
 
 const ROUNDS = [
   { title: 'Quarterfinals', slots: ['QF1', 'QF2', 'QF3', 'QF4'] },
@@ -19,13 +19,6 @@ const isLocked = (ctx) => ctx.settings.knockoutLockMs != null && Date.now() >= c
 
 // Other players' picks stay hidden until the bracket locks.
 const canSee = (ctx, playerId) => playerId === ctx.me.id || isLocked(ctx);
-
-// Which two teams a player expects in a slot, following their own picks.
-function predictedTeams(bs, picks, slot) {
-  if (!FEEDERS[slot]) return bs[slot].teams;
-  const [f1, f2] = FEEDERS[slot];
-  return [picks[f1] || null, picks[f2] || null];
-}
 
 // Series score for each of the slot's two teams, if the match has started.
 function slotScores(ctx, bs, slot) {

@@ -249,3 +249,28 @@ test('team history: records, game by game, and who is still in', async () => {
   // C9 only played the Play-In and the Swiss has started: out. T1 is eliminated.
   assert.deepEqual([by.C9.out, by.T1.out, by.KC.out, by.GEN.out], [true, true, false, false]);
 });
+
+test('late bracket: listed players can pick each slot until its match starts', async () => {
+  const { bracketState, bracketSlotOpen, predictedTeams } = await import('../js/scoring.js');
+  const now = Date.parse('2026-11-06T06:00:00Z');
+  const H = 3600e3;
+  const matches = [
+    { id: 'q1', bracketSlot: 'QF1', teamA: 'DK', teamB: 'BLG', startMs: now - 8 * H, result: { status: 'final', scoreA: 0, scoreB: 3 } },
+    { id: 'q2', bracketSlot: 'QF2', teamA: 'T1', teamB: 'KC', startMs: now + 16 * H },
+    { id: 'q3', bracketSlot: 'QF3', teamA: 'TES', teamB: 'IG', startMs: now - 56 * H, result: { status: 'final', scoreA: 1, scoreB: 3 } },
+    { id: 'q4', bracketSlot: 'QF4', teamA: 'GEN', teamB: 'LYON', startMs: now - 32 * H, result: { status: 'final', scoreA: 3, scoreB: 0 } },
+    { id: 's2', bracketSlot: 'SF2', teamA: 'GEN', teamB: 'IG', startMs: now + 40 * H },
+  ];
+  const bstate = bracketState(matches);
+  const settings = { knockoutLockMs: now - 70 * H, lateBracket: { players: ['late'], untilMs: now + 200 * H } };
+  const open = (playerId, slot) => bracketSlotOpen({ settings, matches, bstate, playerId, slot, now });
+  assert.deepEqual(['QF1', 'QF2', 'QF3', 'QF4', 'SF1', 'SF2', 'F'].map((s) => open('late', s)), [false, true, false, false, true, true, true]);
+  assert.equal(open('onTime', 'QF2'), false); // everyone else stays locked
+  // SF1 is listed as "TBD vs BLG", but BLG came from QF1: it stays on top, once.
+  matches.push({ id: 's1', bracketSlot: 'SF1', teamA: 'TBD', teamB: 'BLG', startMs: now + 64 * H });
+  assert.deepEqual(bracketState(matches).SF1.teams, ['BLG', null]);
+  // A late picker sees the real QF1 winner next to their own QF2 pick.
+  assert.deepEqual(predictedTeams(bstate, { QF2: 'KC' }, 'SF1'), ['BLG', 'KC']);
+  // An on-time picker keeps seeing their own (wrong) picks.
+  assert.deepEqual(predictedTeams(bstate, { QF1: 'DK', QF2: 'T1' }, 'SF1'), ['DK', 'T1']);
+});
